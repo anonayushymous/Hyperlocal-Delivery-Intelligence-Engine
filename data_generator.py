@@ -1,164 +1,136 @@
-import numpy as np
 import pandas as pd
+import numpy as np
 from faker import Faker
-import datetime
 import random
+from datetime import datetime, timedelta
 
 fake = Faker('en_IN')
 np.random.seed(42)
 random.seed(42)
 
-def generate_all_data(n_users=10000, n_orders=50000):
-    print("Generating users and dark stores...")
-    # 1. Dark Stores Dimension
-    dark_stores = [
-        {"dark_store_id": f"DS_{i:02d}", "zone": f"Zone_{chr(65 + i%6)}", "capacity_orders_per_hr": np.random.randint(60, 150)}
-        for i in range(1, 13)
+def generate_all_data(n_users=5000, n_orders=25000):
+    start_date = datetime.now() - timedelta(days=60)
+    
+    # 1. Dark Stores with Real Geocoordinates (Mumbai area mock)
+    stores_data = [
+        {"dark_store_id": "DS_01", "zone": "Bandra West", "capacity_orders_per_hr": 220, "lat": 19.0596, "lon": 72.8295},
+        {"dark_store_id": "DS_02", "zone": "Andheri East", "capacity_orders_per_hr": 350, "lat": 19.1136, "lon": 72.8697},
+        {"dark_store_id": "DS_03", "zone": "Koramangala", "capacity_orders_per_hr": 300, "lat": 12.9352, "lon": 77.6245},
+        {"dark_store_id": "DS_04", "zone": "Indiranagar", "capacity_orders_per_hr": 280, "lat": 12.9784, "lon": 77.6408},
+        {"dark_store_id": "DS_05", "zone": "Cyber Hub", "capacity_orders_per_hr": 400, "lat": 28.4950, "lon": 77.0895},
+        {"dark_store_id": "DS_06", "zone": "Powai Hub", "capacity_orders_per_hr": 250, "lat": 19.1176, "lon": 72.9060},
+        {"dark_store_id": "DS_07", "zone": "Whitefield", "capacity_orders_per_hr": 320, "lat": 12.9698, "lon": 77.7500}
     ]
-    df_stores = pd.DataFrame(dark_stores)
+    df_stores = pd.DataFrame(stores_data)
 
-    # 2. Users Dimension
-    user_ids = [f"U_{i:06d}" for i in range(n_users)]
-    user_records = []
-    for uid in user_ids:
-        signup_dt = fake.date_time_between(start_date='-180d', end_date='now')
-        user_records.append({
-            "user_id": uid,
-            "signup_at": signup_dt,
-            "city_tier": np.random.choice(["Tier-1", "Tier-2"], p=[0.75, 0.25]),
-            "acquisition_channel": np.random.choice(["Meta_Ads", "Google_Search", "Organic", "Referral"], p=[0.35, 0.30, 0.25, 0.10]),
-            "experiment_group": np.random.choice(["control_flat_fee", "treatment_dynamic_surge"], p=[0.50, 0.50])
+    # 2. Riders Fleet
+    riders_data = []
+    for i in range(1, 151):
+        riders_data.append({
+            "rider_id": f"RIDER_{i:03d}",
+            "dark_store_id": random.choice(df_stores["dark_store_id"].tolist()),
+            "rating": round(random.uniform(4.2, 5.0), 2),
+            "vehicle_type": random.choice(["Electric Scooter", "Motorcycle", "Bicycle"])
         })
-    df_users = pd.DataFrame(user_records)
+    df_riders = pd.DataFrame(riders_data)
 
-    # 3. SKU / Product Catalog Dimension
-    categories = ["Dairy & Eggs", "Beverages", "Snacks & Munchies", "Instant Food", "Fresh Produce"]
+    # 3. Users
+    users = []
+    for i in range(1, n_users + 1):
+        users.append({
+            "user_id": f"USR_{i:05d}",
+            "signup_at": start_date + timedelta(days=random.randint(0, 30)),
+            "city_tier": random.choices(["Tier 1", "Tier 2"], weights=[0.75, 0.25])[0],
+            "experiment_group": random.choice(["control", "treatment"])
+        })
+    df_users = pd.DataFrame(users)
+
+    # 4. SKUs
+    categories = {
+        "Dairy & Bread": [("Amul Butter 100g", 55, 60), ("Nandini Milk 500ml", 24, 28), ("Brown Bread 400g", 40, 50)],
+        "Fresh Vegetables": [("Farm Potatoes 1kg", 25, 35), ("Red Onions 1kg", 30, 45), ("Tomatoes 500g", 20, 30)],
+        "Snacks & Munchies": [("Lay's Chips Classic", 15, 20), ("Kurkure Masala", 15, 20), ("Almonds 200g", 140, 190)],
+        "Instant Food": [("Maggi 4-Pack", 48, 56), ("Cup Noodles", 38, 50)]
+    }
     skus = []
-    for i in range(1, 101):
-        cat = np.random.choice(categories)
-        base_price = round(np.random.uniform(20.0, 500.0), 2)
-        skus.append({
-            "sku_id": f"SKU_{i:04d}",
-            "sku_name": f"{cat} Item {i}",
-            "category": cat,
-            "cost_price": round(base_price * 0.75, 2),
-            "selling_price": base_price
-        })
+    sku_id = 1
+    for cat, items in categories.items():
+        for name, cost, sell in items:
+            skus.append({"sku_id": f"SKU_{sku_id:03d}", "sku_name": name, "category": cat, "cost_price": cost, "selling_price": sell})
+            sku_id += 1
     df_skus = pd.DataFrame(skus)
 
-    # 4. Inventory Snapshots
-    print("Generating inventory snapshots...")
-    inventory_records = []
-    for store in df_stores["dark_store_id"]:
+    # 5. Inventory
+    inventory = []
+    for store_id in df_stores["dark_store_id"]:
         for sku in df_skus["sku_id"]:
-            stock_level = np.random.randint(0, 45)
-            threshold = 10
-            inventory_records.append({
-                "dark_store_id": store,
+            stock = random.choices([0, random.randint(1, 5), random.randint(15, 60)], weights=[0.05, 0.15, 0.80])[0]
+            inventory.append({
+                "dark_store_id": store_id,
                 "sku_id": sku,
-                "stock_on_hand": stock_level,
-                "reorder_threshold": threshold,
-                "is_out_of_stock": 1 if stock_level == 0 else 0
+                "stock_on_hand": stock,
+                "reorder_threshold": 10,
+                "is_out_of_stock": 1 if stock == 0 else 0
             })
-    df_inventory = pd.DataFrame(inventory_records)
+    df_inventory = pd.DataFrame(inventory)
 
-    # 5. Orders & Funnel Events
-    print(f"Simulating {n_orders} orders and behavioral clickstream events...")
-    order_records = []
-    event_records = []
-    event_id_counter = 1
-
-    for i in range(n_orders):
-        user_row = df_users.sample(1).iloc[0]
-        uid = user_row["user_id"]
-        group = user_row["experiment_group"]
+    # 6. Orders with Failures, Delivery Times, and Complaints
+    orders = []
+    events = []
+    failure_reasons = ["Customer Not Reachable", "Incorrect Address", "Rider Vehicle Breakdown", "Item Damaged in Transit", "Customer Cancelled Late"]
+    complaint_types = ["Late Delivery (>15m)", "Missing Item", "Damaged Packaging", "Rider Behavior", "Wrong Item Delivered"]
+    
+    for i in range(1, n_orders + 1):
+        user = random.choice(users)
+        store = random.choice(stores_data)
+        rider = random.choice(df_riders[df_riders["dark_store_id"] == store["dark_store_id"]].to_dict('records') or riders_data)
         
-        placed_time = fake.date_time_between(start_date=user_row["signup_at"], end_date='now')
-        hour = placed_time.hour
-        is_rush = 19 <= hour <= 22 or 8 <= hour <= 10
-        session_id = f"SESS_{i:08d}"
+        order_time = start_date + timedelta(days=random.randint(0, 59), hours=random.randint(6, 23), minutes=random.randint(0, 59))
+        is_rush_hour = order_time.hour in [8, 9, 10, 19, 20, 21, 22]
+        
+        # Treatment vs Control Pricing
+        if user["experiment_group"] == "treatment" and is_rush_hour:
+            surge_fee = random.choice([25.0, 35.0, 50.0])
+            base_basket = np.random.gamma(shape=5.0, scale=80.0) + 30.0
+        else:
+            surge_fee = 0.0
+            base_basket = np.random.gamma(shape=4.8, scale=75.0)
 
-        # Clickstream Funnel Progression
-        event_records.append({
-            "event_id": f"EVT_{event_id_counter:09d}",
-            "session_id": session_id,
-            "user_id": uid,
-            "event_name": "search",
-            "event_timestamp": placed_time - datetime.timedelta(minutes=np.random.randint(5, 15))
+        # Status: 94% Delivered, 6% Failed
+        status = random.choices(["delivered", "failed", "cancelled"], weights=[0.94, 0.04, 0.02])[0]
+        failure_reason = random.choice(failure_reasons) if status != "delivered" else None
+        
+        # Delivery Time Distribution (Log-normal bell curve around 11 mins)
+        del_time = float(np.random.lognormal(mean=2.35, sigma=0.32)) if status == "delivered" else None
+        
+        # Customer Complaints (5% of delivered orders lodge a complaint)
+        has_complaint = (random.random() < 0.05) if status == "delivered" else False
+        complaint_reason = random.choice(complaint_types) if has_complaint else None
+
+        order_id = f"ORD_{i:06d}"
+        orders.append({
+            "order_id": order_id,
+            "user_id": user["user_id"],
+            "dark_store_id": store["dark_store_id"],
+            "rider_id": rider["rider_id"],
+            "placed_at": order_time,
+            "order_value": round(base_basket, 2),
+            "delivery_fee": 15.0,
+            "surge_fee": surge_fee,
+            "delivery_time_mins": round(del_time, 1) if del_time else None,
+            "sla_target_mins": 12.0,
+            "status": status,
+            "failure_reason": failure_reason,
+            "complaint_reason": complaint_reason
         })
-        event_id_counter += 1
 
-        # Search to Cart (~70% probability)
-        converted_to_cart = np.random.rand() < 0.70
-        if converted_to_cart:
-            event_records.append({
-                "event_id": f"EVT_{event_id_counter:09d}",
-                "session_id": session_id,
-                "user_id": uid,
-                "event_name": "add_to_cart",
-                "event_timestamp": placed_time - datetime.timedelta(minutes=np.random.randint(2, 5))
-            })
-            event_id_counter += 1
+        # Clickstream Funnel Events
+        session_id = f"SESS_{i:06d}"
+        events.append({"event_id": f"EV_{i}_1", "session_id": session_id, "user_id": user["user_id"], "event_name": "search", "event_timestamp": order_time - timedelta(minutes=6)})
+        events.append({"event_id": f"EV_{i}_2", "session_id": session_id, "user_id": user["user_id"], "event_name": "add_to_cart", "event_timestamp": order_time - timedelta(minutes=4)})
+        if random.random() < 0.85:
+            events.append({"event_id": f"EV_{i}_3", "session_id": session_id, "user_id": user["user_id"], "event_name": "checkout_start", "event_timestamp": order_time - timedelta(minutes=2)})
+            if random.random() < 0.90:
+                events.append({"event_id": f"EV_{i}_4", "session_id": session_id, "user_id": user["user_id"], "event_name": "order_placed", "event_timestamp": order_time})
 
-            # Cart to Checkout (~80% probability)
-            converted_to_checkout = np.random.rand() < 0.80
-            if converted_to_checkout:
-                event_records.append({
-                    "event_id": f"EVT_{event_id_counter:09d}",
-                    "session_id": session_id,
-                    "user_id": uid,
-                    "event_name": "checkout_start",
-                    "event_timestamp": placed_time - datetime.timedelta(minutes=1)
-                })
-                event_id_counter += 1
-
-                # Pricing calculation based on A/B testing cohort
-                if group == "control_flat_fee":
-                    delivery_fee = 15.0
-                    surge_fee = 0.0
-                    drop_prob = 0.05
-                else:
-                    delivery_fee = 15.0
-                    surge_fee = np.random.choice([20.0, 35.0, 50.0], p=[0.5, 0.35, 0.15]) if is_rush else 0.0
-                    # Slight drop-off increase due to surge pricing elasticity
-                    drop_prob = 0.12 if is_rush else 0.05
-
-                # Checkout to Placed Order
-                if np.random.rand() > drop_prob:
-                    event_records.append({
-                        "event_id": f"EVT_{event_id_counter:09d}",
-                        "session_id": session_id,
-                        "user_id": uid,
-                        "event_name": "order_placed",
-                        "event_timestamp": placed_time
-                    })
-                    event_id_counter += 1
-
-                    # Order fulfillment metrics
-                    base_delivery_time = np.random.normal(loc=17 if is_rush else 11, scale=3.5)
-                    delivery_mins = max(5.0, round(base_delivery_time, 1))
-                    sla_target = 12.0
-                    order_val = round(np.random.exponential(scale=380) + 120, 2)
-
-                    order_records.append({
-                        "order_id": f"ORD_{i:08d}",
-                        "user_id": uid,
-                        "dark_store_id": np.random.choice(df_stores["dark_store_id"]),
-                        "placed_at": placed_time,
-                        "order_value": order_val,
-                        "delivery_fee": delivery_fee,
-                        "surge_fee": surge_fee,
-                        "delivery_time_mins": delivery_mins,
-                        "sla_target_mins": sla_target,
-                        "status": np.random.choice(["delivered", "cancelled"], p=[0.97, 0.03])
-                    })
-
-    df_orders = pd.DataFrame(order_records)
-    df_events = pd.DataFrame(event_records)
-
-    return df_users, df_stores, df_skus, df_inventory, df_orders, df_events
-
-if __name__ == "__main__":
-    users, stores, skus, inventory, orders, events = generate_all_data(n_users=5000, n_orders=20000)
-    print("Sample generation complete:")
-    print(f"Users: {len(users)}, Orders: {len(orders)}, Events: {len(events)}")
+    return df_users, df_stores, df_riders, df_skus, df_inventory, pd.DataFrame(orders), pd.DataFrame(events)

@@ -1,4 +1,3 @@
-import time
 from sqlalchemy import create_engine, text
 from config import DB_URI
 from data_generator import generate_all_data
@@ -11,6 +10,7 @@ def init_db_and_load():
     DROP TABLE IF EXISTS fct_order_events;
     DROP TABLE IF EXISTS fct_inventory;
     DROP TABLE IF EXISTS fct_orders;
+    DROP TABLE IF EXISTS dim_riders;
     DROP TABLE IF EXISTS dim_skus;
     DROP TABLE IF EXISTS dim_dark_stores;
     DROP TABLE IF EXISTS dim_users;
@@ -19,14 +19,22 @@ def init_db_and_load():
         user_id TEXT PRIMARY KEY,
         signup_at TIMESTAMP NOT NULL,
         city_tier TEXT,
-        acquisition_channel TEXT,
         experiment_group TEXT
     );
 
     CREATE TABLE dim_dark_stores (
         dark_store_id TEXT PRIMARY KEY,
         zone TEXT,
-        capacity_orders_per_hr INTEGER
+        capacity_orders_per_hr INTEGER,
+        lat REAL,
+        lon REAL
+    );
+
+    CREATE TABLE dim_riders (
+        rider_id TEXT PRIMARY KEY,
+        dark_store_id TEXT,
+        rating REAL,
+        vehicle_type TEXT
     );
 
     CREATE TABLE dim_skus (
@@ -50,13 +58,16 @@ def init_db_and_load():
         order_id TEXT PRIMARY KEY,
         user_id TEXT,
         dark_store_id TEXT,
+        rider_id TEXT,
         placed_at TIMESTAMP NOT NULL,
         order_value REAL,
         delivery_fee REAL,
         surge_fee REAL,
         delivery_time_mins REAL,
         sla_target_mins REAL,
-        status TEXT
+        status TEXT,
+        failure_reason TEXT,
+        complaint_reason TEXT
     );
 
     CREATE TABLE fct_order_events (
@@ -74,18 +85,18 @@ def init_db_and_load():
             if stmt.strip():
                 conn.execute(text(stmt))
 
-    # Generate and Insert Data
-    users, stores, skus, inventory, orders, events = generate_all_data(n_users=5000, n_orders=20000)
+    users, stores, riders, skus, inventory, orders, events = generate_all_data(n_users=5000, n_orders=25000)
 
     print("Loading data into SQLite...")
     stores.to_sql("dim_dark_stores", engine, if_exists="append", index=False)
+    riders.to_sql("dim_riders", engine, if_exists="append", index=False)
     users.to_sql("dim_users", engine, if_exists="append", index=False, chunksize=2000)
     skus.to_sql("dim_skus", engine, if_exists="append", index=False)
     inventory.to_sql("fct_inventory", engine, if_exists="append", index=False, chunksize=2000)
     orders.to_sql("fct_orders", engine, if_exists="append", index=False, chunksize=2000)
     events.to_sql("fct_order_events", engine, if_exists="append", index=False, chunksize=5000)
 
-    print("Data ingestion complete. 'hyperlocal.db' created successfully!")
+    print("Data ingestion complete. 'hyperlocal.db' is ready with all new features!")
 
 if __name__ == "__main__":
     init_db_and_load()
