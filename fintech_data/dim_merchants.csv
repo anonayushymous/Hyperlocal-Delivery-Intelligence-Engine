@@ -1,0 +1,8 @@
+merchant_id,merchant_name,tier,category
+M_101,QuickMart Instamart,Enterprise,Q-Commerce
+M_102,Zomato Dineout,Enterprise,Food Delivery
+M_103,UrbanGlow Apparel,Mid-Market,E-Commerce
+M_104,SaaSFlow CRM,Mid-Market,SaaS
+M_105,Nova Gaming Network,Enterprise,Gaming
+M_106,ChaiCorner Cafe,SMB,Offline POS
+M_107,CraftBazaar Studio,SMB,E-Commerce

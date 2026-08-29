@@ -1,0 +1,142 @@
+import os
+import random
+from datetime import datetime, timedelta
+import numpy as np
+import pandas as pd
+
+np.random.seed(42)
+random.seed(42)
+
+os.makedirs("fintech_data", exist_ok=True)
+
+# 1. Generate dim_merchants
+merchants = [
+    {"merchant_id": "M_101", "merchant_name": "QuickMart Instamart", "tier": "Enterprise", "category": "Q-Commerce"},
+    {"merchant_id": "M_102", "merchant_name": "Zomato Dineout", "tier": "Enterprise", "category": "Food Delivery"},
+    {"merchant_id": "M_103", "merchant_name": "UrbanGlow Apparel", "tier": "Mid-Market", "category": "E-Commerce"},
+    {"merchant_id": "M_104", "merchant_name": "SaaSFlow CRM", "tier": "Mid-Market", "category": "SaaS"},
+    {"merchant_id": "M_105", "merchant_name": "Nova Gaming Network", "tier": "Enterprise", "category": "Gaming"},
+    {"merchant_id": "M_106", "merchant_name": "ChaiCorner Cafe", "tier": "SMB", "category": "Offline POS"},
+    {"merchant_id": "M_107", "merchant_name": "CraftBazaar Studio", "tier": "SMB", "category": "E-Commerce"}
+]
+df_merchants = pd.DataFrame(merchants)
+df_merchants.to_csv("fintech_data/dim_merchants.csv", index=False)
+
+# 2. Generate dim_banks
+banks = [
+    {"bank_id": "BNK_01", "bank_name": "HDFC Bank", "network_reliability_tier": "Tier 1"},
+    {"bank_id": "BNK_02", "bank_name": "State Bank of India", "network_reliability_tier": "Tier 2"},
+    {"bank_id": "BNK_03", "bank_name": "ICICI Bank", "network_reliability_tier": "Tier 1"},
+    {"bank_id": "BNK_04", "bank_name": "Axis Bank", "network_reliability_tier": "Tier 1"},
+    {"bank_id": "BNK_05", "bank_name": "Kotak Mahindra Bank", "network_reliability_tier": "Tier 2"}
+]
+df_banks = pd.DataFrame(banks)
+df_banks.to_csv("fintech_data/dim_banks.csv", index=False)
+
+# 3. Generate dim_methods
+methods = [
+    {"method_id": "PM_01", "payment_mode": "UPI", "provider": "NPCI"},
+    {"method_id": "PM_02", "payment_mode": "Credit Card", "provider": "Visa"},
+    {"method_id": "PM_03", "payment_mode": "Credit Card", "provider": "Mastercard"},
+    {"method_id": "PM_04", "payment_mode": "Debit Card", "provider": "RuPay"},
+    {"method_id": "PM_05", "payment_mode": "NetBanking", "provider": "Direct Bank Gateway"}
+]
+df_methods = pd.DataFrame(methods)
+df_methods.to_csv("fintech_data/dim_methods.csv", index=False)
+
+# 4. Generate fct_payments (60,000 Transactions)
+n_txns = 60000
+start_date = datetime(2026, 6, 1)
+
+payments = []
+for i in range(1, n_txns + 1):
+    m = random.choice(merchants)
+    b = random.choice(banks)
+    p = random.choice(methods)
+    
+    txn_time = start_date + timedelta(
+        days=random.randint(0, 80),
+        hours=random.randint(0, 23),
+        minutes=random.randint(0, 59),
+        seconds=random.randint(0, 59)
+    )
+    
+    # Amount distributions by category
+    if m["category"] == "Gaming":
+        amt = round(random.uniform(50, 1200), 2)
+    elif m["category"] == "SaaS":
+        amt = round(random.uniform(2500, 18000), 2)
+    elif m["category"] == "Q-Commerce":
+        amt = round(random.uniform(150, 2500), 2)
+    else:
+        amt = round(random.uniform(200, 5000), 2)
+    
+    # Status & Error Modeling
+    # Simulate SBI / peak hour degradation
+    is_sbi = (b["bank_name"] == "State Bank of India")
+    is_peak = txn_time.hour in [19, 20, 21, 22]
+    
+    failure_prob = 0.18 if (is_sbi and is_peak) else 0.08
+    drop_prob = 0.04
+    
+    rand_val = random.random()
+    if rand_val < (1.0 - failure_prob - drop_prob):
+        status = "SUCCESS"
+        error = "NONE"
+        latency = int(np.random.normal(loc=1100, scale=300))
+    elif rand_val < (1.0 - drop_prob):
+        status = "FAILED"
+        error = random.choices(
+            ["ISSUER_DOWNTIME", "INSUFFICIENT_FUNDS", "AUTH_TIMEOUT", "NETWORK_FAILURE"],
+            weights=[0.40, 0.30, 0.20, 0.10]
+        )[0]
+        latency = int(np.random.normal(loc=3800, scale=900))
+    else:
+        status = "USER_DROPPED"
+        error = "AUTH_TIMEOUT"
+        latency = int(np.random.normal(loc=5500, scale=1200))
+    
+    # MDR calculation
+    if p["payment_mode"] == "UPI":
+        mdr_rate = 0.0 if amt <= 2000 else 0.0065
+    elif p["payment_mode"] == "Credit Card":
+        mdr_rate = 0.0185
+    elif p["payment_mode"] == "Debit Card":
+        mdr_rate = 0.0090
+    else:
+        mdr_rate = 0.0150
+        
+    payments.append({
+        "txn_id": f"TXN_{i:07d}",
+        "date_key": txn_time.strftime("%Y-%m-%d"),
+        "timestamp": txn_time,
+        "merchant_id": m["merchant_id"],
+        "bank_id": b["bank_id"],
+        "method_id": p["method_id"],
+        "amount": amt,
+        "status": status,
+        "error_category": error,
+        "latency_ms": max(150, latency),
+        "mdr_rate_pct": mdr_rate
+    })
+
+df_payments = pd.DataFrame(payments)
+df_payments.to_csv("fintech_data/fct_payments.csv", index=False)
+
+# 5. Generate dim_date
+unique_dates = pd.date_range(start="2026-06-01", end="2026-08-31")
+date_dim = []
+for d in unique_dates:
+    date_dim.append({
+        "date_key": d.strftime("%Y-%m-%d"),
+        "Date": d,
+        "Month": d.strftime("%B"),
+        "Month_Year": d.strftime("%b %Y"),
+        "Quarter": f"Q{((d.month-1)//3)+1}",
+        "Day_Of_Week": d.strftime("%A"),
+        "Is_Weekend": 1 if d.weekday() in [5, 6] else 0
+    })
+df_date = pd.DataFrame(date_dim)
+df_date.to_csv("fintech_data/dim_date.csv", index=False)
+
+print("Generated 5 CSV files in the 'fintech_data/' directory.")

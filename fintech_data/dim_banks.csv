@@ -1,0 +1,6 @@
+bank_id,bank_name,network_reliability_tier
+BNK_01,HDFC Bank,Tier 1
+BNK_02,State Bank of India,Tier 2
+BNK_03,ICICI Bank,Tier 1
+BNK_04,Axis Bank,Tier 1
+BNK_05,Kotak Mahindra Bank,Tier 2

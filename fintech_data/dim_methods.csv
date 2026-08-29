@@ -1,0 +1,6 @@
+method_id,payment_mode,provider
+PM_01,UPI,NPCI
+PM_02,Credit Card,Visa
+PM_03,Credit Card,Mastercard
+PM_04,Debit Card,RuPay
+PM_05,NetBanking,Direct Bank Gateway
