@@ -4,12 +4,21 @@ A comprehensive analytics and intelligence platform for hyperlocal delivery oper
 
 ## Overview
 
-This project simulates and analyzes a quick-commerce delivery platform (similar to Blinkit, Zepto, or Instamart) that promises deliveries within 12 minutes. It includes synthetic data generation, a data warehouse schema, and an interactive Streamlit dashboard for operational analytics.
+This project simulates and analyzes a quick-commerce delivery platform (similar to Blinkit, Zepto, or Instamart) that promises deliveries within 12 minutes. Built on a modern microservices architecture, it features a FastAPI backend for data services, a Streamlit frontend for visualization, PostgreSQL database, and containerized deployment with Docker Compose.
+
+## Architecture
+
+This platform is built on a microservices architecture with clear separation of concerns:
+
+- **Backend (FastAPI)**: RESTful API providing real-time metrics and analytics services
+- **Frontend (Streamlit)**: Interactive dashboard consuming backend API endpoints
+- **Database (PostgreSQL)**: Data warehouse with dimensional modeling for OLAP queries
+- **Containerization (Docker)**: Fully orchestrated multi-service deployment
 
 ## Features
 
 ### 1. Sales & Growth Analytics
-- Total revenue and order volume tracking
+- Total revenue and order volume tracking via RESTful API
 - Customer shopping funnel analysis with drop-off visualization
 - Average order value and success rate monitoring
 - Real-time conversion metrics
@@ -20,59 +29,67 @@ This project simulates and analyzes a quick-commerce delivery platform (similar 
 - Rider performance leaderboard with ratings
 - Late delivery identification and root cause analysis
 
-### 3. Delivery Quality Diagnostics
-- Delivery time distribution analysis (bell curve visualization)
-- Failed delivery reason breakdown
-- Customer complaint tracking by zone and type
-- Quality metrics and root cause identification
-
-### 4. Dynamic Surge Pricing A/B Testing
-- Experimental framework for testing rush-hour surge fees
-- Statistical evaluation of pricing strategies
-- Conversion rate and average order value comparison
-- Business impact analysis with recommendations
-
 ## Project Structure
 
 ```
 hyperlocal-intelligence-engine/
-├── app.py                      # Main Streamlit dashboard application
-├── config.py                   # Database configuration
-├── data_generator.py           # Synthetic data generation for users, orders, riders, stores
-├── db_loader.py                # Database schema creation and data loading
-├── requirements.txt            # Python dependencies
-├── run_pipeline.sh             # Automated pipeline execution script
-├── Dockerfile                  # Container configuration
-├── docker-compose.yml          # Multi-service orchestration
-├── analytics/
-│   ├── __init__.py
-│   ├── ab_testing.py          # A/B test evaluation logic
-│   └── anomaly_detection.py   # Time-series anomaly detection for fulfillment
-└── sql/
-    ├── 01_funnel_conversion.sql    # Funnel analysis queries
-    ├── 02_rolling_sla_breach.sql   # SLA breach monitoring
-    └── 03_retention_cohorts.sql    # User retention cohort analysis
+├── backend/                          # FastAPI microservice
+│   ├── app/
+│   │   ├── main.py                  # API entry point with endpoint definitions
+│   │   ├── database.py              # SQLAlchemy engine and session management
+│   │   ├── models.py                # ORM models for database tables
+│   │   ├── schemas.py               # Pydantic schemas for API contracts
+│   │   └── services/
+│   │       ├── analytics.py         # Business logic for metrics computation
+│   │       └── ab_testing.py        # A/B testing evaluation service
+│   ├── tests/
+│   │   └── test_api.py              # API endpoint integration tests
+│   ├── Dockerfile                   # Backend container image
+│   └── requirements.txt             # Backend Python dependencies
+├── frontend/                         # Streamlit dashboard
+│   ├── app.py                       # UI application consuming backend APIs
+│   ├── Dockerfile                   # Frontend container image
+│   └── requirements.txt             # Frontend Python dependencies
+├── scripts/                          # Data pipeline utilities
+│   ├── data_generator.py            # Synthetic data generation
+│   └── db_loader.py                 # Database schema creation and seeding
+├── data/                             # Generated data files
+├── sql/                              # Analytical SQL queries
+│   ├── 01_funnel_conversion.sql
+│   ├── 02_rolling_sla_breach.sql
+│   └── 03_retention_cohorts.sql
+├── docker-compose.yml                # Multi-container orchestration
+├── pytest.ini                        # Test configuration
+└── requirements.txt                  # Root-level dependencies
 ```
 
 ## Tech Stack
 
-- **Python 3.8+** - Core programming language
-- **Streamlit** - Interactive dashboard framework
-- **Pandas & NumPy** - Data manipulation and analysis
-- **Plotly** - Interactive visualizations
+### Backend
+- **FastAPI** - High-performance async web framework for RESTful APIs
 - **SQLAlchemy** - Database ORM and query interface
-- **PostgreSQL / SQLite** - Data warehouse (configurable)
+- **Pydantic** - Data validation and serialization
+- **PostgreSQL** - Production-grade data warehouse
+- **Uvicorn** - ASGI server for FastAPI
+
+### Frontend
+- **Streamlit** - Interactive dashboard framework
+- **Pandas** - Data manipulation and analysis
+- **Plotly** - Interactive visualizations
+- **Requests** - HTTP client for API consumption
+
+### Data & DevOps
 - **Faker** - Synthetic data generation
-- **SciPy & Statsmodels** - Statistical analysis for A/B testing
+- **Docker & Docker Compose** - Containerization and orchestration
+- **Pytest** - Backend API testing framework
 
 ## Installation
 
 ### Prerequisites
-- Python 3.8 or higher
-- pip package manager
-- (Optional) Docker for containerized deployment
+- Docker & Docker Compose (recommended)
+- **OR** Python 3.8+ and PostgreSQL for local development
 
-### Setup Instructions
+### Option 1: Docker Deployment (Recommended)
 
 1. Clone the repository:
 ```bash
@@ -80,71 +97,101 @@ git clone https://github.com/yourusername/hyperlocal-intelligence-engine.git
 cd hyperlocal-intelligence-engine
 ```
 
-2. Create and activate a virtual environment:
+2. Start all services with Docker Compose:
 ```bash
-python -m venv venv
-
-# On Windows
-venv\Scripts\activate
-
-# On macOS/Linux
-source venv/bin/activate
+docker-compose up --build
 ```
 
-3. Install dependencies:
+This will start three containers:
+- **PostgreSQL** on port 5432
+- **FastAPI Backend** on port 8000
+- **Streamlit Frontend** on port 8501
+
+3. Access the application:
+- Dashboard: http://localhost:8501
+- API Documentation: http://localhost:8000/docs
+- API Health: http://localhost:8000/health
+
+### Option 2: Local Development Setup
+
+1. Clone the repository:
 ```bash
+git clone https://github.com/yourusername/hyperlocal-intelligence-engine.git
+cd hyperlocal-intelligence-engine
+```
+
+2. Set up PostgreSQL database:
+```bash
+# Create database
+createdb hyperlocal_db
+
+# Or use the provided docker-compose for just the database
+docker-compose up db -d
+```
+
+3. Generate synthetic data and load the database:
+```bash
+python scripts/data_generator.py
+python scripts/db_loader.py
+```
+
+4. Start the backend API:
+```bash
+cd backend
 pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-4. Generate synthetic data and load the database:
+5. Start the frontend dashboard (in a new terminal):
 ```bash
-python db_loader.py
-```
-
-5. Launch the Streamlit dashboard:
-```bash
+cd frontend
+pip install -r requirements.txt
+export API_URL=http://localhost:8000  # On Windows: set API_URL=http://localhost:8000
 streamlit run app.py
 ```
 
-The application will open in your default browser at `http://localhost:8501`
+6. Access the application:
+- Dashboard: http://localhost:8501
+- API: http://localhost:8000
 
 ## Usage
 
-### Running the Full Pipeline
+### API Endpoints
 
-Execute the automated pipeline script:
-```bash
-bash run_pipeline.sh
-```
+The FastAPI backend exposes the following RESTful endpoints:
 
-This will:
-1. Generate synthetic order, user, rider, and store data
-2. Create database schema (fact and dimension tables)
-3. Load data into the warehouse
-4. Launch the analytics dashboard
+- `GET /health` - Health check
+- `GET /api/v1/metrics/sales-summary` - Total revenue, orders, success rate, avg bill
+- `GET /api/v1/metrics/funnel` - Customer journey funnel data
+- `GET /api/v1/metrics/store-delays` - Dark store late delivery rates
+- `GET /api/v1/metrics/rider-performance` - Rider leaderboard
+
+Interactive API documentation available at: http://localhost:8000/docs
 
 ### Dashboard Navigation
 
-The dashboard includes four main modules accessible from the sidebar:
+The Streamlit frontend includes modules accessible from the sidebar:
 
 1. **Sales & Growth Overview** - Monitor revenue, order volume, and conversion funnels
 2. **Warehouse & Rider Operations** - Track delivery performance and rider efficiency
-3. **Delivery Quality & Root Cause Analysis** - Diagnose delays and failures
-4. **Dynamic Surge Pricing A/B Test** - Evaluate pricing experiments
 
 ### Generating Custom Data
 
-Modify parameters in `data_generator.py`:
+Modify parameters in `scripts/data_generator.py`:
 ```python
 generate_all_data(n_users=5000, n_orders=25000)
 ```
 
-Adjust:
-- `n_users`: Number of customers to generate
-- `n_orders`: Total order volume
-- Date ranges, store locations, and other parameters
+Then reload the database:
+```bash
+python scripts/db_loader.py
+```
+
+Restart the backend service to reflect changes.
 
 ## Database Schema
+
+The PostgreSQL data warehouse uses a dimensional model optimized for OLAP queries:
 
 ### Dimension Tables
 - `dim_users` - Customer profiles with experiment groups
@@ -165,23 +212,15 @@ Adjust:
 - **Conversion Rate**: % of sessions resulting in orders
 - **Rider Efficiency**: On-time delivery percentage
 
-## A/B Testing Framework
+## Testing
 
-The platform includes a built-in experimental framework for testing operational changes:
-
-- **Control Group**: Standard flat delivery fee (₹15)
-- **Treatment Group**: Dynamic surge pricing during peak hours (₹20-50)
-- **Statistical Evaluation**: T-tests, confidence intervals, and effect size calculation
-- **Business Metrics**: AOV lift, conversion impact, revenue projection
-
-## Docker Deployment
-
-Build and run with Docker:
+Run backend API tests:
 ```bash
-docker-compose up --build
+cd backend
+pytest tests/ -v
 ```
 
-Access the dashboard at `http://localhost:8501`
+The test suite includes integration tests for all API endpoints.
 
 ## Sample Insights
 
@@ -196,18 +235,26 @@ The platform helps answer critical business questions:
 
 ## Development
 
-### Adding New Analytics Modules
+### Adding New API Endpoints
 
-1. Create SQL queries in the `sql/` directory
-2. Add data loading functions in `app.py` with caching
-3. Design visualizations using Plotly
-4. Add navigation items to the sidebar
+1. Define Pydantic schemas in `backend/app/schemas.py`
+2. Implement business logic in `backend/app/services/analytics.py`
+3. Add endpoint routes in `backend/app/main.py`
+4. Write tests in `backend/tests/test_api.py`
+
+### Adding Frontend Visualizations
+
+1. Fetch data from backend API using `requests`
+2. Transform data with Pandas
+3. Create visualizations using Plotly
+4. Add navigation items to sidebar in `frontend/app.py`
 
 ### Extending the Data Model
 
-1. Modify schema in `db_loader.py`
-2. Update data generation in `data_generator.py`
-3. Regenerate database: `python db_loader.py`
+1. Modify ORM models in `backend/app/models.py`
+2. Update schema in `scripts/db_loader.py`
+3. Update data generation in `scripts/data_generator.py`
+4. Regenerate database: `python scripts/db_loader.py`
 
 ## Future Enhancements
 

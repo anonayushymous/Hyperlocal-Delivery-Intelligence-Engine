@@ -1,44 +1,44 @@
 version: '3.8'
 
 services:
-  postgres_db:
+  db:
     image: postgres:15-alpine
-    container_name: hyperlocal_postgres
+    container_name: delivery_postgres_db
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_USER: hyperlocal_user
+      POSTGRES_PASSWORD: hyperlocal_pass
       POSTGRES_DB: hyperlocal_db
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d hyperlocal_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - postgres_data:/var/lib/postgresql/data
 
-  app:
+  backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
-    container_name: hyperlocal_engine_app
-    restart: on-failure
+    container_name: delivery_fastapi_backend
+    restart: always
     depends_on:
-      postgres_db:
-        condition: service_healthy
+      - db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
-      POSTGRES_HOST: postgres_db
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: hyperlocal_db
+      - DATABASE_URL=postgresql://hyperlocal_user:hyperlocal_pass@db:5432/hyperlocal_db
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: delivery_streamlit_ui
+    restart: always
+    depends_on:
+      - backend
+    environment:
+      - API_URL=http://backend:8000
     ports:
       - "8501:8501"
-    volumes:
-      - .:/app
 
 volumes:
-  pgdata:
-    driver: local
+  postgres_data:
